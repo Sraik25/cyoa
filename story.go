@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"html/template"
 	"io"
+	"log"
 	"net/http"
+	"strings"
 )
 
 func init() {
@@ -27,7 +29,7 @@ var defaultHandlerTmpl = `
     {{end}}
     <u>
         {{range .Options}}
-        <li><a href="#">{{.Text}}</a></li>
+        <li><a href="/{{.Arc}}">{{.Text}}</a></li>
         {{end}}
     </u>
 </body>
@@ -43,12 +45,25 @@ type handler struct {
 }
 
 func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	err := tpl.Execute(w, h.s["intro"])
+	path := strings.TrimSpace(r.URL.Path)
 
-	if err != nil {
-		//fmt.Println(err.Error())
-		panic(err)
+	if path == "" || path == "/" {
+		path = "/intro"
 	}
+
+	path = path[1:]
+
+	if chapter, ok := h.s[path]; ok {
+		err := tpl.Execute(w, chapter)
+		if err != nil {
+			log.Printf("%v", err)
+			http.Error(w, "Something went wrong", http.StatusInternalServerError)
+		}
+
+		return
+	}
+
+	http.Error(w, "Chapter not found", http.StatusNotFound)
 }
 
 func JsonStory(r io.Reader) (Story, error) {
